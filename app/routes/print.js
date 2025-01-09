@@ -19,6 +19,7 @@ export async function loader({ request }) {
       }
       shop {
         url
+        name
       }
     }`,
     {
@@ -31,6 +32,7 @@ export async function loader({ request }) {
   const productData = await response.json();
   const product = productData.data.product;
   const shopUrl = productData.data.shop.url;
+  const shopName = productData.data.shop.name;
 
   // Ensure product exists
   if (!product) {
@@ -47,18 +49,28 @@ export async function loader({ request }) {
   // Build the HTML template
   const productTemplate = `<main>
       <div>
+        <img src="https://www.bueroaufloesung.ch/cdn/shop/files/Logo.png?v=1730824553" style="max-width: 300px; height: auto; margin: 0 auto 50px auto;" />
         <h1>${product.title}</h1>
-        ${
-          product.featuredImage
-            ? `<img src="${product.featuredImage.url}" alt="${product.title}" style="max-width: 100%; height: auto; margin-top: 1rem;" />`
-            : ""
-        }
-        ${
-          qrCodeDataUrl
-            ? `<img src="${qrCodeDataUrl}" alt="QR Code for ${product.title}" style="max-width: 150px; height: auto; margin-top: 1rem;" />`
-            : "<p>No QR Code available for this product.</p>"
-        }
-        <p>${shopUrl}</p>
+
+        <div class="row">
+          <div class="col-6">
+            ${
+              qrCodeDataUrl
+                ? `<img src="${qrCodeDataUrl}" style="width: 70%; height: auto; margin-top: -25px;margin-left: -10px;" />`
+                : "<p>No QR Code available for this product.</p>"
+            }
+          </div>
+          <div class="col-6">
+            ${
+            product.featuredImage
+              ? `<img src="${product.featuredImage.url}" style="max-width: 100%; height: auto;" />`
+              : ""
+            }
+          </div>
+        </div>
+
+       
+        
         <p>Scan the QR code to view this product in our online shop, where you can find more information, purchase it, or express your interest.</p>
         <p>Do you have questions?<br>Send your question with a photo of this label via WhatsApp to 076 420 00 40. Thank you!</p>
       </div>
@@ -95,19 +107,28 @@ function printHTML(pages) {
         padding: 3rem 2rem;
       }
       h1 {
-        font-size: 2.5rem;
+        font-size: 2rem;
         font-weight: 400;
-        margin: 0;
+        margin-bottom: 40px;
       }
       img {
         display: block;
         max-width: 100%;
         height: auto;
-        margin-top: 1rem;
       }
       p {
         font-size: 1rem;
         margin: 1rem 0;
+      }
+
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        margin-right: -15px;
+        margin-left: -15px;
+      }
+      .col-6 {
+        flex: 0 0 50%;
       }
     </style>
     ${title}
