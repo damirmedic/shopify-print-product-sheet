@@ -12,27 +12,54 @@ export async function loader({ request }) {
       product(id: $productId) {
         title
         handle
+        totalInventory
         onlineStoreUrl
         featuredImage {
           url
         }
+        variants(first: 1) {
+          edges {
+            node {
+              sku
+            }
+          }
+        }
+        metafield(namespace: "custom", key: "zustand") {
+          value
+        }
       }
       shop {
         url
-        name
       }
     }`,
     {
       variables: {
         productId: productId,
       },
-    }
+    },
+  );
+
+  const metaStandort = await admin.graphql(
+    `query getProduct($productId: ID!) {
+      product(id: $productId) {
+        metafield(namespace: "custom", key: "standort") {
+          value
+        }
+      }
+    }`,
+    {
+      variables: {
+        productId: productId,
+      },
+    },
   );
 
   const productData = await response.json();
+  const standortData = await metaStandort.json();
   const product = productData.data.product;
   const shopUrl = productData.data.shop.url;
-  const shopName = productData.data.shop.name;
+  const zustand = JSON.parse(product.metafield.value)[0];
+  const standort = standortData.data.product.metafield.value;
 
   // Ensure product exists
   if (!product) {
@@ -49,30 +76,45 @@ export async function loader({ request }) {
   // Build the HTML template
   const productTemplate = `<main>
       <div>
-        <img src="https://www.bueroaufloesung.ch/cdn/shop/files/Logo.png?v=1730824553" style="max-width: 300px; height: auto; margin: 0 auto 50px auto;" />
+        <img src="https://www.bueroaufloesung.ch/cdn/shop/files/Logo.png?v=1730824553" style="max-width: 250px; height: auto; margin: 0 auto 50px auto;" />
         <h1>${product.title}</h1>
 
-        <div class="row">
+        <div class="row" style="margin-top: 30px;margin-bottom: 60px;">
           <div class="col-6">
             ${
               qrCodeDataUrl
-                ? `<img src="${qrCodeDataUrl}" style="width: 70%; height: auto; margin-top: -25px;margin-left: -10px;" />`
+                ? `<img src="${qrCodeDataUrl}" style="width: 75%; height: auto; margin-top: -25px;margin-left: -25px;margin-bottom: 0;" />`
                 : "<p>No QR Code available for this product.</p>"
             }
+            <div class="qr-code-text">
+              <p class="f-15">QR LINK ZUM SHOP</p>
+              <p class="f-12" style="margin-bottom: 15px;">Artikel Nr. ${product.variants.edges[0]?.node.sku}</p>
+              <p class="f-10">Durch das Scannen des QR-Links gelangen Sie in useren Online-Shop, auf welchem Sie weitere Informationen zum Produkt finden und es <span class="underline">direkt kaufen</span> oder Ihr <span class="underline">Ineresse bekunden</span> können.</p>
+            </div>
           </div>
           <div class="col-6">
             ${
-            product.featuredImage
-              ? `<img src="${product.featuredImage.url}" style="max-width: 100%; height: auto;" />`
-              : ""
+              product.featuredImage
+                ? `<img src="${product.featuredImage.url}" style="max-width: 100%; height: auto;" />`
+                : ""
             }
           </div>
         </div>
 
-       
-        
-        <p>Scan the QR code to view this product in our online shop, where you can find more information, purchase it, or express your interest.</p>
-        <p>Do you have questions?<br>Send your question with a photo of this label via WhatsApp to 076 420 00 40. Thank you!</p>
+        <div style="margin-bottom: 150px;">
+          <p class="f-15">Haben Sie Fragen?</p>
+          <p class="f-15">Senden Sie Ihre Frage mit einem Foto dieser Etikette per WhatsApp an: <span class="underline">076 420 00 40</span></p>
+          <br>
+          <p class="f-15">Vielen Dank!</p>
+        </div>
+
+        <div class="interne-info">
+          <p class="f-12">Interne Informationen</p>
+          <p class="f-12">Menge Total: ${product.totalInventory}</p>
+          <p class="f-12">Standorte: ${standort}</p>
+          <p class="f-12">Zustand: ${zustand}</p>
+        </div>
+
       </div>
     </main>`;
 
@@ -84,7 +126,7 @@ export async function loader({ request }) {
       headers: {
         "Content-type": "text/html",
       },
-    })
+    }),
   );
 }
 
@@ -95,19 +137,20 @@ function printHTML(pages) {
   const printTemplate = `<!DOCTYPE html>
   <html lang="en">
   <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
     <style>
       body, html {
         font-size: 16px;
-        line-height: normal;
+        line-height: 1.35;
         margin: 0;
         padding: 0;
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
       }
       main {
-        padding: 3rem 2rem;
+        padding: 2rem 1rem;
       }
       h1 {
-        font-size: 2rem;
+        font-size: 28px;
         font-weight: 400;
         margin-bottom: 40px;
       }
@@ -118,17 +161,40 @@ function printHTML(pages) {
       }
       p {
         font-size: 1rem;
-        margin: 1rem 0;
+        margin: 0;
       }
-
       .row {
         display: flex;
         flex-wrap: wrap;
-        margin-right: -15px;
-        margin-left: -15px;
+        gap: 30px;
+        justify-content: space-between;
       }
       .col-6 {
-        flex: 0 0 50%;
+        flex: 0 0 calc(50% - 15px);
+      }
+      .qr-code-text {
+        padding-left: 0px;
+      }
+      .underline {
+        text-decoration: underline;
+      }
+      .f-10 {
+        font-size: 10px;
+      }
+      .f-12 {
+        font-size: 12px;
+      }
+      .f-13 {
+        font-size: 13px;
+      }
+      .f-15 {
+        font-size: 15px;
+      }
+      .f-18 {
+        font-size: 18px;
+      }
+      .interne-info p {
+        margin-bottom: 15px;
       }
     </style>
     ${title}
