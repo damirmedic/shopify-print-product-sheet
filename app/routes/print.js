@@ -89,7 +89,7 @@ export async function loader({ request }) {
             <div class="qr-code-text">
               <p class="f-15">QR LINK ZUM SHOP</p>
               <p class="f-12" style="margin-bottom: 15px;">Artikel Nr. ${product.variants.edges[0]?.node.sku}</p>
-              <p class="f-10">Durch das Scannen des QR-Links gelangen Sie in useren Online-Shop, auf welchem Sie weitere Informationen zum Produkt finden und es <span class="underline">direkt kaufen</span> oder Ihr <span class="underline">Ineresse bekunden</span> können.</p>
+              <p class="f-10">Durch das Scannen des QR-Links gelangen Sie in unseren Online-Shop, auf welchem Sie weitere Informationen zum Produkt finden und es <span class="underline">direkt kaufen</span> oder Ihr <span class="underline">Ineresse bekunden</span> können.</p>
             </div>
           </div>
           <div class="col-6">
