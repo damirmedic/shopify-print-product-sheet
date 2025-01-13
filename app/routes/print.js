@@ -1,10 +1,18 @@
-import { authenticate } from "../shopify.server";
-import QRCode from "qrcode";
-
 export async function loader({ request }) {
-  const { cors, admin } = await authenticate.admin(request);
+  const { admin } = await authenticate.admin(request);
   const url = new URL(request.url);
   const productId = url.searchParams.get("productId");
+
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "https://admin.shopify.com",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
+  }
 
   try {
     // Fetch product details
@@ -33,11 +41,7 @@ export async function loader({ request }) {
           url
         }
       }`,
-      {
-        variables: {
-          productId: productId,
-        },
-      },
+      { variables: { productId } },
     );
 
     const metaStandort = await admin.graphql(
@@ -48,55 +52,29 @@ export async function loader({ request }) {
           }
         }
       }`,
-      {
-        variables: {
-          productId: productId,
-        },
-      },
+      { variables: { productId } },
     );
 
-    // Combine the response data
-    const result = {
-      ...response,
-      standort: metaStandort?.product?.metafield?.value || null,
-    };
+    const productData = await response.json();
+    const standortData = await metaStandort.json();
+    const product = productData.data.product;
+    const shopUrl = productData.data.shop.url;
+    const zustand = JSON.parse(product.metafield.value)[0];
+    const standort = standortData.data.product.metafield.value;
 
-    // Return JSON response with CORS headers
-    return cors({
-      json: result,
-    });
-  } catch (error) {
-    console.error("Error fetching product data:", error);
+    // Ensure product exists
+    if (!product) {
+      return new Response("Product not found", { status: 404 });
+    }
 
-    // Return an error response with CORS headers
-    return cors({
-      status: 500,
-      json: { error: "Failed to fetch product data" },
-    });
-  }
-}
+    const qrCodeString = `${shopUrl}/products/${product.handle}?utm_source=QR`;
 
+    // Generate QR Code
+    const qrCodeDataUrl = qrCodeString
+      ? await QRCode.toDataURL(qrCodeString)
+      : null;
 
-  const productData = await response.json();
-  const standortData = await metaStandort.json();
-  const product = productData.data.product;
-  const shopUrl = productData.data.shop.url;
-  const zustand = JSON.parse(product.metafield.value)[0];
-  const standort = standortData.data.product.metafield.value;
-
-  // Ensure product exists
-  if (!product) {
-    throw new Response("Product not found", { status: 404 });
-  }
-
-  const qrCodeString = `${shopUrl}/products/${product.handle}?utm_source=QR`;
-
-  // Generate QR Code for product URL (fallback to empty string if no URL)
-  const qrCodeDataUrl = qrCodeString
-    ? await QRCode.toDataURL(qrCodeString)
-    : null;
-
-  // Build the HTML template
+    // Build the HTML template
   const productTemplate = `<main>
       <div>
         <img src="https://www.bueroaufloesung.ch/cdn/shop/files/Logo.png?v=1730824553" style="max-width: 250px; height: auto; margin: 0 auto 50px auto;" />
@@ -141,16 +119,19 @@ export async function loader({ request }) {
       </div>
     </main>`;
 
-  // Generate the full HTML response
-  const print = printHTML([productTemplate]);
-  return cors(
-    new Response(print, {
-      status: 200,
-      headers: {
-        "Content-type": "text/html",
-      },
-    }),
-  );
+   // Generate the full HTML response
+   const print = printHTML([productTemplate]);
+   return new Response(print, {
+     status: 200,
+     headers: {
+       "Content-Type": "text/html",
+       "Access-Control-Allow-Origin": "*", // Or specific origin
+     },
+   });
+ } catch (error) {
+   console.error("Error:", error);
+   return new Response("Internal Server Error", { status: 500 });
+ }
 }
 
 const title = `<title>Product Printer</title>`;
