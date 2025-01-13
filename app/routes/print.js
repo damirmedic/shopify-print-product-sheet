@@ -6,53 +6,76 @@ export async function loader({ request }) {
   const url = new URL(request.url);
   const productId = url.searchParams.get("productId");
 
-  // Fetch product details
-  const response = await admin.graphql(
-    `query getProduct($productId: ID!) {
-      product(id: $productId) {
-        title
-        handle
-        totalInventory
-        onlineStoreUrl
-        featuredImage {
-          url
-        }
-        variants(first: 1) {
-          edges {
-            node {
-              sku
+  try {
+    // Fetch product details
+    const response = await admin.graphql(
+      `query getProduct($productId: ID!) {
+        product(id: $productId) {
+          title
+          handle
+          totalInventory
+          onlineStoreUrl
+          featuredImage {
+            url
+          }
+          variants(first: 1) {
+            edges {
+              node {
+                sku
+              }
             }
           }
+          metafield(namespace: "custom", key: "zustand") {
+            value
+          }
         }
-        metafield(namespace: "custom", key: "zustand") {
-          value
+        shop {
+          url
         }
-      }
-      shop {
-        url
-      }
-    }`,
-    {
-      variables: {
-        productId: productId,
+      }`,
+      {
+        variables: {
+          productId: productId,
+        },
       },
-    },
-  );
+    );
 
-  const metaStandort = await admin.graphql(
-    `query getProduct($productId: ID!) {
-      product(id: $productId) {
-        metafield(namespace: "custom", key: "standort") {
-          value
+    const metaStandort = await admin.graphql(
+      `query getProduct($productId: ID!) {
+        product(id: $productId) {
+          metafield(namespace: "custom", key: "standort") {
+            value
+          }
         }
-      }
-    }`,
-    {
-      variables: {
-        productId: productId,
+      }`,
+      {
+        variables: {
+          productId: productId,
+        },
       },
-    },
-  );
+    );
+
+    // Combine the response data
+    const result = {
+      ...response,
+      standort: metaStandort?.product?.metafield?.value || null,
+    };
+
+    // Return JSON response with CORS headers
+    return cors({
+      json: result,
+    });
+  } catch (error) {
+    console.error("Error fetching product data:", error);
+
+    // Return an error response with CORS headers
+    return cors({
+      status: 500,
+      json: { error: "Failed to fetch product data" },
+    });
+  }
+}
+
 
   const productData = await response.json();
   const standortData = await metaStandort.json();
