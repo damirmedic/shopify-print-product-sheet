@@ -73,13 +73,15 @@ export async function loader({ request }) {
   const standortData = await metaStandort.json();
   const product = productData.data.product;
   const shopUrl = productData.data.shop.url;
-  const zustand = JSON.parse(product.metafield.value)[0];
-  const standort = standortData.data.product.metafield.value;
 
   // Ensure product exists
   if (!product) {
     throw new Response("Product not found", { status: 404 });
   }
+
+  // Safely get metafield values (check if they exist)
+  const zustand = product.metafield ? JSON.parse(product.metafield.value)[0] : "Unknown";
+  const standort = standortData.data.product.metafield ? standortData.data.product.metafield.value : "Unknown";
 
   const qrCodeString = `${shopUrl}/products/${product.handle}?utm_source=QR`;
 
