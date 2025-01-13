@@ -80,8 +80,8 @@ export async function loader({ request }) {
   }
 
   // Safely get metafield values (check if they exist)
-  const zustand = product.metafield ? JSON.parse(product.metafield.value)[0] : "Unknown";
-  const standort = standortData.data.product.metafield ? standortData.data.product.metafield.value : "Unknown";
+  const zustand = product.metafield ? JSON.parse(product.metafield.value)[0] : " ";
+  const standort = standortData.data.product.metafield ? standortData.data.product.metafield.value : " ";
 
   const qrCodeString = `${shopUrl}/products/${product.handle}?utm_source=QR`;
 
