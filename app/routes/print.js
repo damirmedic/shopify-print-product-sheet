@@ -2,158 +2,152 @@ import { authenticate } from "../shopify.server";
 import QRCode from "qrcode";
 
 export async function loader({ request }) {
+  const { cors, admin } = await authenticate.admin(request);
   const url = new URL(request.url);
-  const productId = url.searchParams.get("productId");
 
-  // Handle CORS preflight requests
+  // Handle preflight requests (OPTIONS)
   if (request.method === "OPTIONS") {
     return new Response(null, {
-      status: 204,
+      status: 204, // No Content
       headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Origin": "https://admin.shopify.com", // Replace with the allowed origin
+        "Access-Control-Allow-Methods": "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Content-Type-Options, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Max-Age": "7200",
       },
     });
   }
 
-  if (request.method !== "GET") {
-    return new Response("Method Not Allowed", {
-      status: 405,
-      headers: { "Access-Control-Allow-Origin": "*" },
-    });
-  }
+  const productId = url.searchParams.get("productId");
 
-  try {
-    const { cors, admin } = await authenticate.admin(request);
-
-    // Fetch product details
-    const response = await admin.graphql(
-      `query getProduct($productId: ID!) {
-        product(id: $productId) {
-          title
-          handle
-          totalInventory
-          onlineStoreUrl
-          featuredImage {
-            url
-          }
-          variants(first: 1) {
-            edges {
-              node {
-                sku
-              }
-            }
-          }
-          metafield(namespace: "custom", key: "zustand") {
-            value
-          }
-        }
-        shop {
+  // Fetch product details
+  const response = await admin.graphql(
+    `query getProduct($productId: ID!) {
+      product(id: $productId) {
+        title
+        handle
+        totalInventory
+        onlineStoreUrl
+        featuredImage {
           url
         }
-      }`,
-      {
-        variables: {
-          productId: productId,
-        },
-      },
-    );
-
-    const metaStandort = await admin.graphql(
-      `query getProduct($productId: ID!) {
-        product(id: $productId) {
-          metafield(namespace: "custom", key: "standort") {
-            value
+        variants(first: 1) {
+          edges {
+            node {
+              sku
+            }
           }
         }
-      }`,
-      {
-        variables: {
-          productId: productId,
-        },
+        metafield(namespace: "custom", key: "zustand") {
+          value
+        }
+      }
+      shop {
+        url
+      }
+    }`,
+    {
+      variables: {
+        productId: productId,
       },
-    );
+    },
+  );
 
-    const productData = await response.json();
-    const standortData = await metaStandort.json();
-    const product = productData.data.product;
-    const shopUrl = productData.data.shop.url;
-    const zustand = JSON.parse(product.metafield.value)[0];
-    const standort = standortData.data.product.metafield.value;
+  const metaStandort = await admin.graphql(
+    `query getProduct($productId: ID!) {
+      product(id: $productId) {
+        metafield(namespace: "custom", key: "standort") {
+          value
+        }
+      }
+    }`,
+    {
+      variables: {
+        productId: productId,
+      },
+    },
+  );
 
-    // Ensure product exists
-    if (!product) {
-      throw new Response("Product not found", { status: 404 });
-    }
+  const productData = await response.json();
+  const standortData = await metaStandort.json();
+  const product = productData.data.product;
+  const shopUrl = productData.data.shop.url;
+  const zustand = JSON.parse(product.metafield.value)[0];
+  const standort = standortData.data.product.metafield.value;
 
-    const qrCodeString = `${shopUrl}/products/${product.handle}?utm_source=QR`;
+  // Ensure product exists
+  if (!product) {
+    throw new Response("Product not found", { status: 404 });
+  }
 
-    // Generate QR Code for product URL (fallback to empty string if no URL)
-    const qrCodeDataUrl = qrCodeString
-      ? await QRCode.toDataURL(qrCodeString)
-      : null;
+  const qrCodeString = `${shopUrl}/products/${product.handle}?utm_source=QR`;
 
-    // Build the HTML template
-    const productTemplate = `<main>
-        <div>
-          <img src="https://www.bueroaufloesung.ch/cdn/shop/files/Logo.png?v=1730824553" style="max-width: 250px; height: auto; margin: 0 auto 50px auto;" />
-          <h1>${product.title}</h1>
+  // Generate QR Code for product URL (fallback to empty string if no URL)
+  const qrCodeDataUrl = qrCodeString
+    ? await QRCode.toDataURL(qrCodeString)
+    : null;
 
-          <div class="row" style="margin-top: 30px;margin-bottom: 60px;">
-            <div class="col-6">
-              ${
-                qrCodeDataUrl
-                  ? `<img src="${qrCodeDataUrl}" style="width: 75%; height: auto; margin-top: -25px;margin-left: -25px;margin-bottom: 0;" />`
-                  : "<p>No QR Code available for this product.</p>"
-              }
-              <div class="qr-code-text">
-                <p class="f-15">QR LINK ZUM SHOP</p>
-                <p class="f-12" style="margin-bottom: 15px;">Artikel Nr. ${product.variants.edges[0]?.node.sku}</p>
-                <p class="f-10">Durch das Scannen des QR-Links gelangen Sie in unseren Online-Shop, auf welchem Sie weitere Informationen zum Produkt finden und es <span class="underline">direkt kaufen</span> oder Ihr <span class="underline">Ineresse bekunden</span> können.</p>
-              </div>
-            </div>
-            <div class="col-6">
-              ${
-                product.featuredImage
-                  ? `<img src="${product.featuredImage.url}" style="max-width: 100%; height: auto;" />`
-                  : ""
-              }
+  // Build the HTML template
+  const productTemplate = `<main>
+      <div>
+        <img src="https://www.bueroaufloesung.ch/cdn/shop/files/Logo.png?v=1730824553" style="max-width: 250px; height: auto; margin: 0 auto 50px auto;" />
+        <h1>${product.title}</h1>
+
+        <div class="row" style="margin-top: 30px;margin-bottom: 60px;">
+          <div class="col-6">
+            ${
+              qrCodeDataUrl
+                ? `<img src="${qrCodeDataUrl}" style="width: 75%; height: auto; margin-top: -25px;margin-left: -25px;margin-bottom: 0;" />`
+                : "<p>No QR Code available for this product.</p>"
+            }
+            <div class="qr-code-text">
+              <p class="f-15">QR LINK ZUM SHOP</p>
+              <p class="f-12" style="margin-bottom: 15px;">Artikel Nr. ${product.variants.edges[0]?.node.sku}</p>
+              <p class="f-10">Durch das Scannen des QR-Links gelangen Sie in unseren Online-Shop, auf welchem Sie weitere Informationen zum Produkt finden und es <span class="underline">direkt kaufen</span> oder Ihr <span class="underline">Ineresse bekunden</span> können.</p>
             </div>
           </div>
-
-          <div style="margin-bottom: 150px;">
-            <p class="f-15">Haben Sie Fragen?</p>
-            <p class="f-15">Senden Sie Ihre Frage mit einem Foto dieser Etikette per WhatsApp an: <span class="underline">076 420 00 40</span></p>
-            <br>
-            <p class="f-15">Vielen Dank!</p>
-          </div>
-
-          <div class="interne-info">
-            <p class="f-12">Interne Informationen</p>
-            <p class="f-12">Menge Total: ${product.totalInventory}</p>
-            <p class="f-12">Standorte: ${standort}</p>
-            <p class="f-12">Zustand: ${zustand}</p>
+          <div class="col-6">
+            ${
+              product.featuredImage
+                ? `<img src="${product.featuredImage.url}" style="max-width: 100%; height: auto;" />`
+                : ""
+            }
           </div>
         </div>
-      </main>`;
 
-    // Generate the full HTML response
-    const print = printHTML([productTemplate]);
-    return new Response(print, {
+        <div style="margin-bottom: 150px;">
+          <p class="f-15">Haben Sie Fragen?</p>
+          <p class="f-15">Senden Sie Ihre Frage mit einem Foto dieser Etikette per WhatsApp an: <span class="underline">076 420 00 40</span></p>
+          <br>
+          <p class="f-15">Vielen Dank!</p>
+        </div>
+
+        <div class="interne-info">
+          <p class="f-12">Interne Informationen</p>
+          <p class="f-12">Menge Total: ${product.totalInventory}</p>
+          <p class="f-12">Standorte: ${standort}</p>
+          <p class="f-12">Zustand: ${zustand}</p>
+        </div>
+
+      </div>
+    </main>`;
+
+  // Generate the full HTML response
+  const print = printHTML([productTemplate]);
+  return cors(
+    new Response(print, {
       status: 200,
       headers: {
         "Content-Type": "text/html",
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": "https://admin.shopify.com", // Replace with the allowed origin
+        "Access-Control-Allow-Methods": "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Content-Type-Options, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Max-Age": "7200",
       },
-    });
-  } catch (error) {
-    console.error("Error:", error);
-    return new Response("Internal Server Error", {
-      status: 500,
-      headers: { "Access-Control-Allow-Origin": "*" },
-    });
-  }
+    }),
+  );
 }
 
 const title = `<title>Product Printer</title>`;
